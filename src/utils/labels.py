@@ -7,7 +7,9 @@ VALID_ENTITY_LABELS = {
     'TIMESTAMP',
     'TOTAL_COST',
     'OTHER',
+    'SIGNATURE',
 }
+
 
 # Mapping chuẩn hóa: sửa các nhãn bị gõ sai / không đồng nhất
 LABEL_NORMALIZATION_MAP = {

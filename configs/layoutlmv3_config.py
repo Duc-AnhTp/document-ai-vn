@@ -13,7 +13,8 @@ LABEL_LIST = [
     'B-SELLER', 'I-SELLER',
     'B-SELLER_ADDRESS', 'I-SELLER_ADDRESS',
     'B-TIMESTAMP', 'I-TIMESTAMP',
-    'B-TOTAL_COST', 'I-TOTAL_COST'
+    'B-TOTAL_COST', 'I-TOTAL_COST',
+    'B-SIGNATURE', 'I-SIGNATURE'
 ]
 
 LABEL2ID = {label: idx for idx, label in enumerate(LABEL_LIST)}
