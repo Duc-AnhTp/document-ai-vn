@@ -1,3 +1,5 @@
+"""Script huấn luyện LayoutLMv3 cho bài toán KIE (Key Information Extraction)."""
+
 from transformers import (
     LayoutLMv3ForTokenClassification,
     Trainer,
@@ -11,22 +13,26 @@ from configs.layoutlmv3_config import (
     LEARNING_RATE,
     MODEL_NAME,
     NUM_EPOCHS,
+    NUM_LABELS,
     TRAIN_BATCH_SIZE,
     WEIGHT_DECAY,
 )
 from configs.paths import CHECKPOINT_DIR, PROCESSED_DIR
-from src.kie.dataset import build_hf_dataset, encode_example
+from src.kie.dataset import build_encode_fn, build_hf_dataset, get_processor
 from src.kie.evaluate import compute_metrics
 
 
+def main() -> None:
+    """Chạy toàn bộ pipeline huấn luyện LayoutLMv3."""
+    processor = get_processor()
+    encode_fn = build_encode_fn(processor)
 
-def main():
-    train_ds = build_hf_dataset(str(PROCESSED_DIR / 'train.jsonl')).map(encode_example)
-    val_ds = build_hf_dataset(str(PROCESSED_DIR / 'val.jsonl')).map(encode_example)
+    train_ds = build_hf_dataset(str(PROCESSED_DIR / 'train.jsonl')).map(encode_fn)
+    val_ds = build_hf_dataset(str(PROCESSED_DIR / 'val.jsonl')).map(encode_fn)
 
     model = LayoutLMv3ForTokenClassification.from_pretrained(
         MODEL_NAME,
-        num_labels=len(LABEL2ID),
+        num_labels=NUM_LABELS,
         id2label=ID2LABEL,
         label2id=LABEL2ID,
     )
@@ -42,7 +48,9 @@ def main():
         save_strategy='epoch',
         logging_steps=20,
         load_best_model_at_end=True,
-        report_to='none',
+        metric_for_best_model='f1',
+        fp16=True,          # Tăng tốc + tiết kiệm VRAM trên GPU T4/A100
+        report_to='none',   # Tắt wandb
     )
 
     trainer = Trainer(
@@ -55,6 +63,7 @@ def main():
 
     trainer.train()
     trainer.save_model(str(CHECKPOINT_DIR / 'best_model'))
+    print(f'Best model saved to: {CHECKPOINT_DIR / "best_model"}')
 
 
 if __name__ == '__main__':

@@ -9,12 +9,12 @@ albumentations>=1.3.0
 opencv-python-headless>=4.7.0
 
 # OCR
-paddlepaddle>=2.5.0
+paddlepaddle-gpu
 paddleocr>=2.7.0
 
 # Deep Learning & KIE
 torch>=2.0.0
-transformers>=4.30.0
+transformers>=4.36.0
 datasets>=2.14.0
 
 # Evaluation
@@ -22,3 +22,6 @@ seqeval>=1.2.2
 
 # Visualization
 matplotlib>=3.6.0
+
+# Dataset download
+gdown>=4.7.1

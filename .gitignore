@@ -1,0 +1,32 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# === Virtual Environments ===
+.venv/
+venv/
+env/
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Data & Outputs (không commit dữ liệu lớn) ===
+data/mcocr/
+outputs/
+
+# === Jupyter ===
+.ipynb_checkpoints/
+
+# === Distribution / Packaging ===
+dist/
+build/
+*.egg-info/

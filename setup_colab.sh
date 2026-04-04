@@ -1,42 +1,38 @@
 #!/bin/bash
 # =============================================================
 # Script setup môi trường trên Google Colab
-# Chạy cell đầu tiên trong notebook: !bash setup_colab.sh
+# Sử dụng: !bash setup_colab.sh (trong notebook cell đầu tiên)
 # =============================================================
 
 set -e
 
-echo "=== [1/4] Mount Google Drive ==="
-# Drive được mount qua notebook cell, script chỉ kiểm tra
-if [ ! -d "/content/drive/MyDrive" ]; then
-    echo "CẢNH BÁO: Google Drive chưa mount. Hãy chạy:"
-    echo "  from google.colab import drive"
-    echo "  drive.mount('/content/drive')"
-    exit 1
-fi
-
-echo "=== [2/4] Clone / cập nhật repo ==="
-REPO_DIR="/content/document-ai-vn"
 REPO_URL="https://github.com/Duc-AnhTp/document-ai-vn.git"
+REPO_DIR="/content/document-ai-vn"
 
+echo "=== [1/3] Clone / cập nhật repo ==="
 if [ -d "$REPO_DIR" ]; then
-    echo "Repo đã tồn tại, pull latest..."
-    cd "$REPO_DIR" && git pull
+    echo "Repo đã tồn tại, cập nhật..."
+    cd "$REPO_DIR" && git pull --quiet
 else
-    git clone "$REPO_URL" "$REPO_DIR"
+    git clone --quiet "$REPO_URL" "$REPO_DIR"
 fi
 
-echo "=== [3/4] Cài đặt dependencies ==="
-pip install -q paddlepaddle-gpu
-pip install -q paddleocr
-pip install -q transformers datasets seqeval
-pip install -q albumentations opencv-python-headless
-pip install -q matplotlib pandas scikit-learn Pillow
+echo "=== [2/3] Cài đặt dependencies ==="
+cd "$REPO_DIR"
+# Cài gdown trước vì cần để tải dataset
+pip install -q gdown
+pip install -q paddlepaddle-gpu paddleocr
+pip install -r requirements.txt -q
 
-echo "=== [4/4] Thêm repo vào PYTHONPATH ==="
+echo "=== [3/3] Cấu hình PYTHONPATH ==="
 export PYTHONPATH="$REPO_DIR:$PYTHONPATH"
-echo "PYTHONPATH=$PYTHONPATH"
 
 echo ""
-echo "✅ Setup hoàn tất! Repo tại: $REPO_DIR"
-echo "📂 Dataset tại: /content/drive/MyDrive/mcocr/"
+echo "✅ Setup hoàn tất!"
+echo "   Repo : $REPO_DIR"
+echo "   Data : $REPO_DIR/data/mcocr/"
+echo ""
+echo "Bước tiếp theo:"
+echo "  python -m src.preprocessing.download_dataset  # Tải data"
+echo "  python -m src.preprocessing.run_prepare_data  # Tiền xử lý"
+echo "  python -m src.kie.train                        # Huấn luyện"

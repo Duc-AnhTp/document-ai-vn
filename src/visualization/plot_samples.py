@@ -9,13 +9,15 @@ from PIL import Image
 
 # Bảng màu cho từng loại entity
 ENTITY_COLORS = {
-    'SELLER': '#FF6B6B',
+    'SELLER':         '#FF6B6B',
     'SELLER_ADDRESS': '#4ECDC4',
-    'TIMESTAMP': '#45B7D1',
-    'TOTAL_COST': '#FFA07A',
-    'OTHER': '#C0C0C0',
-    'O': '#E0E0E0',
+    'TIMESTAMP':      '#45B7D1',
+    'TOTAL_COST':     '#FFA07A',
+    'SIGNATURE':      '#A29BFE',
+    'OTHER':          '#C0C0C0',
+    'O':              '#E0E0E0',
 }
+
 
 
 def plot_sample_with_boxes(
