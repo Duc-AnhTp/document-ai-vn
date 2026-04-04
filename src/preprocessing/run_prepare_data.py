@@ -34,9 +34,14 @@ def convert_sample(sample):
             bbox = [0, 0, 0, 0]
         boxes.append(bbox)
 
-        prefix = 'B' if entity != prev_entity else 'I'
-        bio_labels.append(f'{prefix}-{entity}')
-        prev_entity = entity
+        # Entity 'OTHER' là background → label 'O' (không dùng BIO prefix)
+        if entity == 'OTHER':
+            bio_labels.append('O')
+            prev_entity = None
+        else:
+            prefix = 'B' if entity != prev_entity else 'I'
+            bio_labels.append(f'{prefix}-{entity}')
+            prev_entity = entity
 
     return {
         'image_path': str(image_path),
