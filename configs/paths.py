@@ -2,10 +2,14 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# Chỉnh hai đường dẫn này khi chạy trên Colab hoặc máy cá nhân
-DATA_ROOT = Path('/content/drive/MyDrive/mcocr')
+# Chỉnh đường dẫn gốc thành cục bộ thuộc project (thay vì phụ thuộc Google Drive)
+DATA_ROOT = PROJECT_ROOT / 'data' / 'mcocr'
 IMAGE_DIR = DATA_ROOT / 'train_images'
 CSV_PATH = DATA_ROOT / 'train_df.csv'
+
+# Tự động tạo thư mục rỗng nếu ai đó vừa clone repo về chưa kịp tải data
+DATA_ROOT.mkdir(parents=True, exist_ok=True)
+IMAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 OUTPUT_ROOT = PROJECT_ROOT / 'outputs'
 PROCESSED_DIR = OUTPUT_ROOT / 'processed'
