@@ -1,16 +1,20 @@
 """Inference: nhận ảnh đầu vào → chạy OCR → LayoutLMv3 → trả về dict thực thể."""
 
+import argparse
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import torch
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from transformers import LayoutLMv3ForTokenClassification, LayoutLMv3Processor
 
 from configs.layoutlmv3_config import ID2LABEL, MODEL_NAME
 from configs.paths import CHECKPOINT_DIR
 from src.ocr.run_paddleocr import extract_text_and_boxes
 from src.utils.bbox import normalize_bbox
+
+logger = logging.getLogger(__name__)
 
 
 def load_model(
@@ -77,13 +81,22 @@ def predict_from_image(
 
     Returns:
         Dict ánh xạ entity_type → text được trích xuất.
-        Trả về dict rỗng nếu OCR không nhận diện được text.
+        Trả về dict rỗng nếu file không hợp lệ hoặc OCR không nhận diện được.
     """
-    image = Image.open(image_path).convert('RGB')
+    try:
+        image = Image.open(image_path).convert('RGB')
+    except FileNotFoundError:
+        logger.error("Không tìm thấy file ảnh: %s", image_path)
+        return {}
+    except UnidentifiedImageError:
+        logger.error("File không phải ảnh hợp lệ: %s", image_path)
+        return {}
+
     width, height = image.size
 
     words, raw_boxes, _ = extract_text_and_boxes(image_path)
     if not words:
+        logger.warning("OCR không phát hiện text trong ảnh: %s", image_path)
         return {}
 
     boxes = [normalize_bbox(box, width, height) for box in raw_boxes]
@@ -117,10 +130,32 @@ def predict_from_image(
     return group_entities(kept_words, decoded_labels)
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse CLI arguments cho inference script."""
+    parser = argparse.ArgumentParser(
+        description='Trích xuất thông tin hóa đơn từ ảnh bằng LayoutLMv3.',
+    )
+    parser.add_argument(
+        '--image', required=True, type=str,
+        help='Đường dẫn tới ảnh hóa đơn cần trích xuất.',
+    )
+    parser.add_argument(
+        '--model-dir', type=str, default=None,
+        help='Thư mục checkpoint model (mặc định: outputs/checkpoints/best_model).',
+    )
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
-    sample_path = input('Nhập đường dẫn ảnh: ').strip()
-    if sample_path:
-        _processor, _model = load_model()
-        result = predict_from_image(sample_path, _processor, _model)
-        for entity, value in result.items():
-            print(f'{entity}: {value}')
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+    args = parse_args()
+    model_dir = Path(args.model_dir) if args.model_dir else None
+
+    _processor, _model = load_model(model_dir)
+    result = predict_from_image(args.image, _processor, _model)
+
+    if not result:
+        logger.info("Không trích xuất được thực thể nào.")
+    for entity, value in result.items():
+        print(f'{entity}: {value}')

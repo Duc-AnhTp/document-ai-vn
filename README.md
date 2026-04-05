@@ -96,8 +96,13 @@ python -m src.preprocessing.run_prepare_data
 ### Inference
 
 ```bash
-python -m src.kie.infer
-# Nhập đường dẫn ảnh → kết quả JSON
+python -m src.kie.infer --image path/to/invoice.jpg
+```
+
+### Table Detection
+
+```bash
+python -m src.table_detection.detector --image path/to/invoice.jpg
 ```
 
 ## 📈 Metrics

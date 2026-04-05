@@ -1,3 +1,6 @@
+"""Pipeline tiền xử lý: parse CSV → clean → BIO labeling → split → lưu JSONL."""
+
+import logging
 from pathlib import Path
 
 from PIL import Image
@@ -9,9 +12,15 @@ from src.preprocessing.split_data import safe_train_val_split
 from src.utils.bbox import normalize_bbox, polygon_to_bbox
 from src.utils.io import save_jsonl
 
+logger = logging.getLogger(__name__)
 
 
 def convert_sample(sample):
+    """Chuyển đổi 1 sample raw thành định dạng JSONL với BIO labels.
+
+    Returns:
+        Dict chứa image_path, words, boxes, labels. None nếu ảnh không tồn tại.
+    """
     image_path = IMAGE_DIR / sample['image_id']
     if not image_path.exists():
         return None
@@ -26,9 +35,9 @@ def convert_sample(sample):
     bio_labels = []
 
     prev_entity = None
-    for i, entity in enumerate(entities):
+    for idx, entity in enumerate(entities):
         if polygons:
-            bbox = polygon_to_bbox(polygons[i])
+            bbox = polygon_to_bbox(polygons[idx])
             bbox = normalize_bbox(bbox, width, height)
         else:
             bbox = [0, 0, 0, 0]
@@ -53,8 +62,10 @@ def convert_sample(sample):
     }
 
 
-
 def main():
+    """Chạy toàn bộ pipeline tiền xử lý dữ liệu MC-OCR."""
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
     samples = parse_mcocr_csv(str(CSV_PATH))
     samples = [clean_sample(sample) for sample in samples]
     samples = [sample for sample in samples if sample.get('texts')]
@@ -68,11 +79,12 @@ def main():
     save_jsonl(train_samples, PROCESSED_DIR / 'train.jsonl')
     save_jsonl(val_samples, PROCESSED_DIR / 'val.jsonl')
 
-    print(f'Tong so mau hop le: {len(converted)}')
-    print(f'So mau train: {len(train_samples)}')
-    print(f'So mau val: {len(val_samples)}')
-    print(f'Da luu vao: {PROCESSED_DIR}')
+    logger.info('Tong so mau hop le: %d', len(converted))
+    logger.info('So mau train: %d', len(train_samples))
+    logger.info('So mau val: %d', len(val_samples))
+    logger.info('Da luu vao: %s', PROCESSED_DIR)
 
 
 if __name__ == '__main__':
     main()
+

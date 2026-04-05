@@ -1,5 +1,7 @@
 """Script huấn luyện LayoutLMv3 cho bài toán KIE (Key Information Extraction)."""
 
+import logging
+
 from transformers import (
     LayoutLMv3ForTokenClassification,
     Trainer,
@@ -21,9 +23,13 @@ from configs.paths import CHECKPOINT_DIR, PROCESSED_DIR
 from src.kie.dataset import build_encode_fn, build_hf_dataset, get_processor
 from src.kie.evaluate import compute_metrics
 
+logger = logging.getLogger(__name__)
+
 
 def main() -> None:
     """Chạy toàn bộ pipeline huấn luyện LayoutLMv3."""
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
     processor = get_processor()
     encode_fn = build_encode_fn(processor)
 
@@ -62,9 +68,12 @@ def main() -> None:
     )
 
     trainer.train()
-    trainer.save_model(str(CHECKPOINT_DIR / 'best_model'))
-    print(f'Best model saved to: {CHECKPOINT_DIR / "best_model"}')
+
+    save_path = CHECKPOINT_DIR / 'best_model'
+    trainer.save_model(str(save_path))
+    logger.info('Best model saved to: %s', save_path)
 
 
 if __name__ == '__main__':
     main()
+
