@@ -1,4 +1,4 @@
-#!/bin/bash
+mlkkl#!/bin/bash
 # =============================================================
 # Script setup môi trường trên Google Colab
 # Sử dụng: !bash setup_colab.sh (trong notebook cell đầu tiên)
