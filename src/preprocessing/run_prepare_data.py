@@ -9,8 +9,7 @@ from configs.paths import CSV_PATH, IMAGE_DIR, PROCESSED_DIR
 from src.preprocessing.clean_data import clean_sample
 from src.preprocessing.parse_mcocr import parse_mcocr_csv
 from src.preprocessing.split_data import safe_train_val_split
-from src.utils.bbox import normalize_bbox, polygon_to_bbox
-from src.utils.io import save_jsonl
+from src.preprocessing.utils import normalize_bbox, polygon_to_bbox, save_jsonl
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,27 @@ import re
 from copy import deepcopy
 from typing import Dict, List
 
-from src.utils.labels import LABEL_NORMALIZATION_MAP, VALID_ENTITY_LABELS
+# Các entity label hợp lệ trong MC-OCR
+VALID_ENTITY_LABELS = {
+    'SELLER', 'ADDRESS', 'TIMESTAMP', 'TOTAL_COST', 'OTHER',
+}
 
+# Bảng chuẩn hóa: map các biến thể label về dạng chuẩn
+LABEL_NORMALIZATION_MAP = {
+    'SELLER': 'SELLER',
+    'STORE': 'SELLER',
+    'ADDRESS': 'ADDRESS',
+    'ADDR': 'ADDRESS',
+    'TIMESTAMP': 'TIMESTAMP',
+    'DATE': 'TIMESTAMP',
+    'TIME': 'TIMESTAMP',
+    'TOTAL_COST': 'TOTAL_COST',
+    'TOTAL': 'TOTAL_COST',
+    'COST': 'TOTAL_COST',
+    'OTHER': 'OTHER',
+    'OTHERS': 'OTHER',
+    'NONE': 'OTHER',
+}
 
 SPACE_PATTERN = re.compile(r'\s+')
 
