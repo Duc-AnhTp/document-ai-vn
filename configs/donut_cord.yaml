@@ -1,0 +1,21 @@
+experiment: "cord_warmup"
+
+model:
+  pretrained: "naver-clova-ix/donut-base"
+  max_length: 768
+  task_prompt: "<s_cord-v2>"
+
+data:
+  dataset_name: "naver-clova-ix/cord-v2"
+  image_size: [1280, 960]
+
+training:
+  epochs: 3
+  batch_size: 2
+  learning_rate: 5e-5
+  warmup_steps: 50
+  gradient_accumulation: 8
+
+output:
+  checkpoint_dir: "results/e2_donut/checkpoints/cord_warmup"
+  log_file: "results/e2_donut/cord_warmup_log.csv"

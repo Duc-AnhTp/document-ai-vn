@@ -1,0 +1,26 @@
+# Core
+torch>=2.0
+transformers>=4.30
+donut-python
+datasets
+
+# OCR baseline
+paddleocr
+paddlepaddle
+
+# Utils
+Pillow
+opencv-python
+matplotlib
+seaborn
+pandas
+numpy
+pyyaml
+tqdm
+
+# Evaluation
+scikit-learn
+
+# Notebook
+jupyter
+ipywidgets

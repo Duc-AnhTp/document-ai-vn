@@ -1,0 +1,23 @@
+# Data (tải bằng script, không commit)
+data/
+
+# Model checkpoints nặng
+results/*/checkpoints/
+*.pt
+*.bin
+*.onnx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+wandb/
+
+# Env
+.env
