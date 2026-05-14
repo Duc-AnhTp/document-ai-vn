@@ -25,14 +25,14 @@ def split_data(records, ratios=(0.8, 0.1, 0.1), seed=42):
     return [records[i] for i in idx[:n1]], [records[i] for i in idx[n1:n1+n2]], [records[i] for i in idx[n1+n2:]]
 
 
-def write_split(records, img_dir, output_dir, name):
+def write_split(records, output_dir, name):
     split_dir = os.path.join(output_dir, name)
     os.makedirs(split_dir, exist_ok=True)
     count = missing = 0
     with open(os.path.join(split_dir, "metadata.jsonl"), "w", encoding="utf-8") as f:
         for rec in records:
             img = rec["file_name"]
-            src = os.path.join(img_dir, img)
+            src = os.path.join(rec["_img_dir"], img)
             if not os.path.exists(src):
                 missing += 1
                 continue
@@ -56,35 +56,47 @@ def main():
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    img_dir = os.path.join(args.input, "img")
-    key_dir = os.path.join(args.input, "key")
-    
-    if not os.path.exists(img_dir) or not os.path.exists(key_dir):
-        print(f"[LOI] Khong tim thay img/ hoac key/ trong {args.input}")
-        return
-
+    sroie_root = args.input
+    if os.path.exists(os.path.join(sroie_root, "SROIE2019")):
+        sroie_root = os.path.join(sroie_root, "SROIE2019")
+        
     records = []
     failed_files = []
-    for txt_file in os.listdir(key_dir):
-        if not txt_file.endswith(".txt"): continue
-        with open(os.path.join(key_dir, txt_file), "r", encoding="utf-8") as f:
-            try:
-                data = json.load(f)
-                data["file_name"] = txt_file.replace(".txt", ".jpg")
-                records.append(data)
-            except json.JSONDecodeError as e:
-                failed_files.append({"file": txt_file, "error": str(e)})
+    
+    for split in ["train", "test"]:
+        img_dir = os.path.join(sroie_root, split, "img")
+        key_dir = os.path.join(sroie_root, split, "entities")
+        
+        if not os.path.exists(img_dir) or not os.path.exists(key_dir):
+            continue
+            
+        for txt_file in os.listdir(key_dir):
+            if not txt_file.endswith(".txt"): continue
+            file_path = os.path.join(key_dir, txt_file)
+            with open(file_path, "r", encoding="utf-8") as f:
+                try:
+                    data = json.load(f)
+                    data["file_name"] = txt_file.replace(".txt", ".jpg")
+                    data["_img_dir"] = img_dir
+                    records.append(data)
+                except Exception as e:
+                    failed_files.append({"file": file_path, "error": str(e)})
+
+    if not records:
+        print(f"[LOI] Khong tim thay du lieu trong {sroie_root} (Can cau truc SROIE2019/train/img va entities)")
+        return
                 
-    print(f"[INFO] Tong: {len(records)} records")
+    print(f"[INFO] Tong hop: {len(records)} records")
     if failed_files:
-        print(f"[WARN] Bo qua {len(failed_files)} file key parse loi")
+        print(f"[WARN] Bo qua {len(failed_files)} file parse loi")
         for item in failed_files[:10]:
             print(f"  - {item['file']}: {item['error']}")
+            
     train, val, test = split_data(records)
     print(f"[INFO] Split: train={len(train)} val={len(val)} test={len(test)}")
 
     for sname, sdata in [("train", train), ("val", val), ("test", test)]:
-        write_split(sdata, img_dir, args.output, sname)
+        write_split(sdata, args.output, sname)
 
     print("[DONE]")
 

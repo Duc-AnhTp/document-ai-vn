@@ -36,26 +36,48 @@ def find_col(columns, candidates):
 
 def parse_csv(csv_path):
     records = []
+    cm = {}
     with open(csv_path, "r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         cols = reader.fieldnames
         print(f"[INFO] Cot CSV: {cols}")
-        cm = {
-            "store_name": find_col(cols, ["store_name", "seller", "company"]),
-            "date": find_col(cols, ["timestamp", "date", "time"]),
-            "total": find_col(cols, ["total_cost", "total", "total_amount"]),
-            "address": find_col(cols, ["address", "addr"]),
-            "image": find_col(cols, ["img_id", "image_id", "filename", "file_name"]),
-        }
-        print(f"[INFO] Mapping: {cm}")
-        for row in reader:
-            records.append({
-                "file_name": row.get(cm["image"], ""),
-                "store_name": normalize_unicode(row.get(cm["store_name"], "")),
-                "date": normalize_unicode(row.get(cm["date"], "")),
-                "total": normalize_unicode(row.get(cm["total"], "")),
-                "address": normalize_unicode(row.get(cm["address"], "")),
-            })
+        
+        if "anno_texts" in cols and "anno_labels" in cols:
+            cm = {"mode": "mcocr_kie_format", "image": "img_id"}
+            print(f"[INFO] Phat hien format MC-OCR KIE (anno_texts, anno_labels)")
+            label_map = {"SELLER": "store_name", "TIMESTAMP": "date", "TOTAL_COST": "total", "ADDRESS": "address"}
+            for row in reader:
+                texts = row["anno_texts"].split("|||")
+                labels = row["anno_labels"].split("|||")
+                res = {"store_name": [], "date": [], "total": [], "address": []}
+                for t, l in zip(texts, labels):
+                    mapped = label_map.get(l)
+                    if mapped:
+                        res[mapped].append(t)
+                records.append({
+                    "file_name": row.get("img_id", ""),
+                    "store_name": normalize_unicode(" ".join(res["store_name"])),
+                    "date": normalize_unicode(" ".join(res["date"])),
+                    "total": normalize_unicode(" ".join(res["total"])),
+                    "address": normalize_unicode(" ".join(res["address"])),
+                })
+        else:
+            cm = {
+                "store_name": find_col(cols, ["store_name", "seller", "company"]),
+                "date": find_col(cols, ["timestamp", "date", "time"]),
+                "total": find_col(cols, ["total_cost", "total", "total_amount"]),
+                "address": find_col(cols, ["address", "addr"]),
+                "image": find_col(cols, ["img_id", "image_id", "filename", "file_name"]),
+            }
+            print(f"[INFO] Mapping fallback: {cm}")
+            for row in reader:
+                records.append({
+                    "file_name": row.get(cm["image"], ""),
+                    "store_name": normalize_unicode(row.get(cm["store_name"], "")),
+                    "date": normalize_unicode(row.get(cm["date"], "")),
+                    "total": normalize_unicode(row.get(cm["total"], "")),
+                    "address": normalize_unicode(row.get(cm["address"], "")),
+                })
     return records, cm
 
 
@@ -79,17 +101,25 @@ def write_split(records, img_dir, output_dir, name):
     split_dir = os.path.join(output_dir, name)
     os.makedirs(split_dir, exist_ok=True)
     count = missing = 0
+    
+    img_cache = {}
+    for dirpath, _, filenames in os.walk(img_dir):
+        for f in filenames:
+            img_cache[f] = os.path.join(dirpath, f)
+            
     with open(os.path.join(split_dir, "metadata.jsonl"), "w", encoding="utf-8") as f:
         for rec in records:
             img = rec["file_name"]
-            src = os.path.join(img_dir, img)
-            if not os.path.exists(src):
+            src = img_cache.get(img)
+            
+            if not src:
                 for ext in [".jpg", ".jpeg", ".png"]:
-                    c = os.path.join(img_dir, img + ext)
-                    if os.path.exists(c):
-                        src, img = c, img + ext
+                    if img + ext in img_cache:
+                        src = img_cache[img + ext]
+                        img = img + ext
                         break
-            if not os.path.exists(src):
+                        
+            if not src:
                 missing += 1
                 continue
             dst = os.path.join(split_dir, img)
@@ -131,7 +161,10 @@ def main():
 
     if records:
         print("\n--- SAMPLE RECORD ---")
-        print(json.dumps(records[0], indent=2, ensure_ascii=False))
+        try:
+            print(json.dumps(records[0], indent=2, ensure_ascii=False))
+        except UnicodeEncodeError:
+            print(json.dumps(records[0], indent=2))
         print("---------------------\n")
         
     if not args.force:

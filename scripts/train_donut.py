@@ -228,7 +228,8 @@ def run_training(config):
     print(f"[INFO] Train: {len(train_ds)} | Val: {len(val_ds)}")
 
     # Optimizer
-    optimizer = torch.optim.AdamW(model.parameters(), lr=config["training"]["learning_rate"])
+    lr = float(config["training"]["learning_rate"])
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     grad_accum = config["training"].get("gradient_accumulation", 1)
     patience = config["training"].get("early_stopping_patience", 999)
     selection_metric = config["training"].get("selection_metric", "f1")
