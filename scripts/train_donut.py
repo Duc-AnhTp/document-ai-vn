@@ -18,7 +18,12 @@ from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from scripts.utils import load_config, compute_metrics, save_metrics, parse_donut_output
+from scripts.utils import (
+    load_config,
+    compute_metrics,
+    parse_donut_output,
+    serialize_donut_parse,
+)
 
 
 # ── Dataset ────────────────────────────────────────────────────────────────
@@ -49,7 +54,8 @@ class DonutLocalDataset(Dataset):
         pixel_values = self.processor(image, return_tensors="pt").pixel_values.squeeze()
 
         gt = json.loads(rec["ground_truth"])
-        target_text = self.task_prompt + json.dumps(gt["gt_parse"], ensure_ascii=False)
+        gt_parse = gt.get("gt_parse", gt)
+        target_text = f"{self.task_prompt}{serialize_donut_parse(gt_parse)}{self.processor.tokenizer.eos_token}"
 
         tokenized = self.processor.tokenizer(
             target_text,
@@ -85,7 +91,8 @@ class DonutHFDataset(Dataset):
         pixel_values = self.processor(image, return_tensors="pt").pixel_values.squeeze()
 
         gt = json.loads(sample["ground_truth"])
-        target_text = self.task_prompt + json.dumps(gt.get("gt_parse", gt), ensure_ascii=False)
+        gt_parse = gt.get("gt_parse", gt) if isinstance(gt, dict) else gt
+        target_text = f"{self.task_prompt}{serialize_donut_parse(gt_parse)}{self.processor.tokenizer.eos_token}"
 
         tokenized = self.processor.tokenizer(
             target_text,
@@ -123,14 +130,20 @@ def train_one_epoch(model, dataloader, optimizer, device, grad_accum=1):
 
         total_loss += outputs.loss.item()
 
+    if len(dataloader) % grad_accum != 0:
+        optimizer.step()
+        optimizer.zero_grad()
+
     return total_loss / len(dataloader)
 
 
 @torch.no_grad()
-def validate(model, processor, dataloader, device, task_prompt=""):
+def validate(model, processor, dataloader, device, task_prompt="", metric_mode="kie_f1"):
     model.eval()
     total_loss = 0
     preds, golds = [], []
+    
+    prompt_ids = processor.tokenizer(task_prompt, add_special_tokens=False, return_tensors="pt").input_ids.to(device)
 
     for batch in tqdm(dataloader, desc="Val"):
         pixel_values = batch["pixel_values"].to(device)
@@ -139,36 +152,39 @@ def validate(model, processor, dataloader, device, task_prompt=""):
         outputs = model(pixel_values=pixel_values, labels=labels)
         total_loss += outputs.loss.item()
 
+        batch_size = pixel_values.shape[0]
+        decoder_input_ids = prompt_ids.repeat(batch_size, 1)
+
         # Generate
         generated = model.generate(
             pixel_values,
+            decoder_input_ids=decoder_input_ids,
             max_length=model.config.decoder.max_position_embeddings,
             pad_token_id=processor.tokenizer.pad_token_id,
             eos_token_id=processor.tokenizer.eos_token_id,
             num_beams=1,
         )
 
-        for gen, lab in zip(generated, labels):
-            pred_text = processor.tokenizer.decode(gen, skip_special_tokens=False)
-            pred_dict = parse_donut_output(pred_text, task_prompt)
-            preds.append(pred_dict)
+        if metric_mode == "kie_f1":
+            for gen, lab in zip(generated, labels):
+                pred_text = processor.tokenizer.decode(gen, skip_special_tokens=False)
+                pred_dict = parse_donut_output(pred_text, task_prompt)
+                preds.append(pred_dict)
 
-            lab_ids = lab[lab != -100]
-            gold_text = processor.tokenizer.decode(lab_ids, skip_special_tokens=False)
-            gold_dict = parse_donut_output(gold_text, task_prompt)
-            golds.append(gold_dict)
+                lab_ids = lab[lab != -100]
+                gold_text = processor.tokenizer.decode(lab_ids, skip_special_tokens=False)
+                gold_dict = parse_donut_output(gold_text, task_prompt)
+                golds.append(gold_dict)
 
     avg_loss = total_loss / len(dataloader)
-    metrics = compute_metrics(preds, golds)
+    if metric_mode == "kie_f1":
+        metrics = compute_metrics(preds, golds)
+    else:
+        metrics = {"overall": {"precision": 0.0, "recall": 0.0, "f1": 0.0}, "per_field": {}}
     return avg_loss, metrics
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Train Donut (E2)")
-    parser.add_argument("--config", required=True)
-    args = parser.parse_args()
-
-    config = load_config(args.config)
+def run_training(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[INFO] Device: {device}")
     print(f"[INFO] Experiment: {config['experiment']}")
@@ -215,6 +231,8 @@ def main():
     optimizer = torch.optim.AdamW(model.parameters(), lr=config["training"]["learning_rate"])
     grad_accum = config["training"].get("gradient_accumulation", 1)
     patience = config["training"].get("early_stopping_patience", 999)
+    selection_metric = config["training"].get("selection_metric", "f1")
+    metric_mode = config["training"].get("metric_mode", "kie_f1")
 
     # Training loop
     ckpt_dir = config["output"]["checkpoint_dir"]
@@ -222,7 +240,7 @@ def main():
     os.makedirs(ckpt_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-    best_f1 = 0
+    best_score = None
     no_improve = 0
 
     with open(log_file, "w", newline="") as csvf:
@@ -233,30 +251,46 @@ def main():
             print(f"\n--- Epoch {epoch}/{config['training']['epochs']} ---")
 
             train_loss = train_one_epoch(model, train_dl, optimizer, device, grad_accum)
-            val_loss, val_metrics = validate(model, processor, val_dl, device, task_prompt)
+            val_loss, val_metrics = validate(model, processor, val_dl, device, task_prompt, metric_mode)
 
             f1 = val_metrics["overall"]["f1"]
             p = val_metrics["overall"]["precision"]
             r = val_metrics["overall"]["recall"]
+            score = f1 if selection_metric == "f1" else -val_loss
 
             writer.writerow([epoch, f"{train_loss:.4f}", f"{val_loss:.4f}", f"{f1:.4f}", f"{p:.4f}", f"{r:.4f}"])
             csvf.flush()
 
             print(f"  train_loss={train_loss:.4f}  val_loss={val_loss:.4f}  F1={f1:.4f}  P={p:.4f}  R={r:.4f}")
 
-            if f1 > best_f1:
-                best_f1 = f1
+            if best_score is None or score > best_score:
+                best_score = score
                 no_improve = 0
                 model.save_pretrained(ckpt_dir)
                 processor.save_pretrained(ckpt_dir)
-                print(f"  [SAVE] Best model F1={best_f1:.4f} -> {ckpt_dir}")
+                if selection_metric == "f1":
+                    print(f"  [SAVE] Best model F1={f1:.4f} -> {ckpt_dir}")
+                else:
+                    print(f"  [SAVE] Best model val_loss={val_loss:.4f} -> {ckpt_dir}")
             else:
                 no_improve += 1
                 if no_improve >= patience:
                     print(f"  [STOP] Early stopping (patience={patience})")
                     break
 
-    print(f"\n[DONE] Best F1={best_f1:.4f} | Log: {log_file} | Checkpoint: {ckpt_dir}")
+    if selection_metric == "f1":
+        print(f"\n[DONE] Best F1={best_score:.4f} | Log: {log_file} | Checkpoint: {ckpt_dir}")
+    else:
+        print(f"\n[DONE] Best val_loss={-best_score:.4f} | Log: {log_file} | Checkpoint: {ckpt_dir}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Train Donut (E2)")
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args()
+
+    config = load_config(args.config)
+    run_training(config)
 
 
 if __name__ == "__main__":

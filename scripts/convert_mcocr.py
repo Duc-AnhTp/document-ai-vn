@@ -56,7 +56,7 @@ def parse_csv(csv_path):
                 "total": normalize_unicode(row.get(cm["total"], "")),
                 "address": normalize_unicode(row.get(cm["address"], "")),
             })
-    return records
+    return records, cm
 
 
 def split_data(records, ratios=(0.8, 0.1, 0.1), seed=42):
@@ -106,24 +106,41 @@ def main():
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--split-ratio", nargs=3, type=float, default=[0.8, 0.1, 0.1])
+    parser.add_argument("--force", action="store_true", help="Bo qua confirm")
     args = parser.parse_args()
 
     # Tim CSV
-    csv_path = None
-    for f in os.listdir(args.input):
-        if f.endswith(".csv"):
-            csv_path = os.path.join(args.input, f)
-            break
-    if not csv_path:
+    csv_files = sorted([f for f in os.listdir(args.input) if f.endswith(".csv")])
+    if not csv_files:
         print(f"[LOI] Khong tim thay CSV trong {args.input}")
         return
+    if len(csv_files) > 1:
+        print(f"[WARN] Tim thay nhieu CSV: {csv_files}")
+        if args.force:
+            print("[WARN] Dang dung CSV dau tien vi --force duoc bat")
+        else:
+            print("[INFO] Hay sap xep/loai bo CSV khong dung neu mapping khong nhu mong doi")
+    csv_path = os.path.join(args.input, csv_files[0])
 
     img_dir = find_image_dir(args.input)
     print(f"[INFO] CSV: {csv_path}")
     print(f"[INFO] Anh: {img_dir}")
 
-    records = parse_csv(csv_path)
+    records, mapping = parse_csv(csv_path)
     print(f"[INFO] Tong: {len(records)} records")
+
+    if records:
+        print("\n--- SAMPLE RECORD ---")
+        print(json.dumps(records[0], indent=2, ensure_ascii=False))
+        print("---------------------\n")
+        
+    if not args.force:
+        print(f"[INFO] Dang su dung CSV: {os.path.basename(csv_path)}")
+        print(f"[INFO] Mapping cuoi: {mapping}")
+        ans = input("Ban co chac muon tiep tuc voi mapping nay khong? (y/n): ")
+        if ans.lower() != 'y':
+            print("Huy bo.")
+            return
 
     train, val, test = split_data(records, tuple(args.split_ratio))
     print(f"[INFO] Split: train={len(train)} val={len(val)} test={len(test)}")

@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from scripts.utils import load_config, compute_metrics, save_metrics, parse_donut_output
 
 # Reuse training logic tu train_donut.py
-from scripts.train_donut import main as train_main
+from scripts.train_donut import run_training
 
 
 def run_error_analysis(checkpoint_dir, test_dir, output_dir):
@@ -43,6 +43,7 @@ def run_error_analysis(checkpoint_dir, test_dir, output_dir):
     field_errors = {"store_name": 0, "date": 0, "total": 0, "address": 0}
 
     preds_list, golds_list = [], []
+    prompt_ids = processor.tokenizer("<s_sroie>", add_special_tokens=False, return_tensors="pt").input_ids.to(device)
 
     for rec in records:
         img_path = os.path.join(test_dir, rec["file_name"])
@@ -53,8 +54,10 @@ def run_error_analysis(checkpoint_dir, test_dir, output_dir):
         pixel_values = processor(image, return_tensors="pt").pixel_values.to(device)
 
         with torch.no_grad():
+            decoder_input_ids = prompt_ids.repeat(pixel_values.shape[0], 1)
             generated = model.generate(
                 pixel_values,
+                decoder_input_ids=decoder_input_ids,
                 max_length=model.config.decoder.max_position_embeddings,
                 pad_token_id=processor.tokenizer.pad_token_id,
                 eos_token_id=processor.tokenizer.eos_token_id,
@@ -103,10 +106,10 @@ def main():
     print("=" * 50)
     print("E3: Fine-tune Donut tren SROIE")
     print("=" * 50)
-    train_main()
+    config = load_config(args.config)
+    run_training(config)
 
     # Error analysis
-    config = load_config(args.config)
     ckpt = config["output"]["checkpoint_dir"]
     test_dir = config["data"]["test_dir"]
     output_dir = os.path.dirname(config["output"]["log_file"])

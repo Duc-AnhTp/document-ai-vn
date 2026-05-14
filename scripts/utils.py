@@ -4,6 +4,8 @@ Hàm tiện ích dùng chung cho toàn bộ dự án Document AI KIE.
 
 import json
 import os
+import re
+import unicodedata
 from pathlib import Path
 
 import yaml
@@ -27,7 +29,40 @@ def normalize_text(text: str) -> str:
     """Chuẩn hoá text để so sánh: lowercase, bỏ khoảng trắng thừa."""
     if not text:
         return ""
-    return " ".join(text.strip().lower().split())
+    text = unicodedata.normalize("NFC", str(text).strip().lower())
+    return " ".join(text.split())
+
+
+def normalize_field_value(field: str, text: str) -> str:
+    """Chuẩn hoá theo từng field để metric bớt phụ thuộc format trình bày."""
+    text = normalize_text(text)
+
+    if field == "date":
+        text = re.sub(r"[\.\-]", "/", text)
+        text = re.sub(r"\s*/\s*", "/", text)
+        return text
+
+    if field == "total":
+        # Gỡ hậu tố tiền tệ và khoảng trắng để so sánh gần hơn về giá trị hiển thị.
+        text = re.sub(r"\b(vnd|vnđ|dong|đ)\b", "", text)
+        text = re.sub(r"[,\.\s]", "", text)
+        return text
+
+    if field == "address":
+        replacements = {
+            "thanh pho": "tp",
+            "tp.": "tp",
+            "quan ": "q ",
+            "q.": "q",
+            "phuong ": "p ",
+            "p.": "p",
+        }
+        for src, dst in replacements.items():
+            text = text.replace(src, dst)
+        text = re.sub(r"[^0-9a-z\s]", " ", text)
+        return " ".join(text.split())
+
+    return text
 
 
 def compute_metrics(preds: list[dict], golds: list[dict]) -> dict:
@@ -50,8 +85,8 @@ def compute_metrics(preds: list[dict], golds: list[dict]) -> dict:
     for field in FIELDS:
         tp = fp = fn = 0
         for pred, gold in zip(preds, golds):
-            p = normalize_text(pred.get(field, ""))
-            g = normalize_text(gold.get(field, ""))
+            p = normalize_field_value(field, pred.get(field, ""))
+            g = normalize_field_value(field, gold.get(field, ""))
 
             if g and p and p == g:
                 tp += 1
@@ -111,6 +146,18 @@ def parse_donut_output(generated_text: str, task_prompt: str = "") -> dict:
         result[field] = match.group(1).strip() if match else ""
 
     return result
+
+
+def serialize_donut_parse(data) -> str:
+    """
+    Serialize ground truth thành text ổn định cho decoder target.
+
+    - Với schema 4 field đơn giản: dùng tag XML-like để giữ tương thích parser hiện tại.
+    - Với schema lồng nhau như CORD: dùng JSON ổn định để tránh ép dict/list sang string Python.
+    """
+    if isinstance(data, dict) and set(data.keys()).issubset(set(FIELDS)):
+        return "".join(f"<s_{k}>{v}</s_{k}>" for k, v in data.items() if v not in ("", None))
+    return json.dumps(data, ensure_ascii=False, sort_keys=True)
 
 
 # ── Visualization ──────────────────────────────────────────────────────────
