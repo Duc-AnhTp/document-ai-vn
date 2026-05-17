@@ -1,0 +1,13 @@
+opencv-python
+pillow
+numpy
+pandas
+paddlepaddle
+paddleocr
+scikit-learn
+scipy
+matplotlib
+gradio
+python-Levenshtein
+tqdm
+pyyaml

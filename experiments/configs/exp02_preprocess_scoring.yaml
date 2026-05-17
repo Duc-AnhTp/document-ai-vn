@@ -1,0 +1,10 @@
+name: exp02_preprocess_scoring
+description: "Exp 2 - OCR + preprocessing + rule scoring"
+
+dataset: mc-ocr
+use_preprocess: true
+extractor_type: scoring
+ocr_lang: en
+use_ocr_cache: true
+force_ocr: false
+error_threshold: 0.30

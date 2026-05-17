@@ -1,0 +1,11 @@
+name: exp03_classifier
+description: "Exp 3 - OCR + TF-IDF + Logistic Regression classifier"
+
+dataset: mc-ocr
+use_preprocess: true
+extractor_type: classifier
+ocr_lang: en
+classifier_train_dataset: mc-ocr
+use_ocr_cache: true
+force_ocr: false
+error_threshold: 0.30

@@ -1,6 +1,9 @@
 # Data (tải bằng script, không commit)
 data/
 
+# Outputs (kết quả chạy experiment)
+outputs/
+
 # Model checkpoints nặng
 results/*/checkpoints/
 *.pt

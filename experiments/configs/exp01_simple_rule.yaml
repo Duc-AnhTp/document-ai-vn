@@ -1,0 +1,10 @@
+name: exp01_simple_rule
+description: "Exp 1 - OCR + simple rule extraction (baseline)"
+
+dataset: mc-ocr          # mc-ocr | sroie | all
+use_preprocess: false
+extractor_type: simple_rule
+ocr_lang: en
+use_ocr_cache: true
+force_ocr: false
+error_threshold: 0.30
