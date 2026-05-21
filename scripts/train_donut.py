@@ -273,6 +273,11 @@ def run_training(config):
     processor = DonutProcessor.from_pretrained(load_path)
     model = VisionEncoderDecoderModel.from_pretrained(load_path)
 
+    if hasattr(model, "gradient_checkpointing_enable"):
+        model.gradient_checkpointing_enable()
+        model.config.use_cache = False
+        print("[INFO] Enabled gradient checkpointing")
+
     added_tokens = config["model"].get("added_tokens", [])
     if added_tokens:
         processor.tokenizer.add_tokens(added_tokens)
