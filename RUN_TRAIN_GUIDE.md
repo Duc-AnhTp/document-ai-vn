@@ -73,7 +73,8 @@ os.makedirs("/kaggle/working/data/mc-ocr/donut_format", exist_ok=True)
 !python scripts/convert_mcocr.py \
     --input /kaggle/input/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021 \
     --output /kaggle/working/data/mc-ocr/donut_format \
-    --split-ratio 0.8 0.1 0.1
+    --split-ratio 0.8 0.1 0.1 \
+    --force
 ```
 
 ### Bước 5: Chỉnh sửa cấu hình YAML phù hợp với đường dẫn Kaggle
