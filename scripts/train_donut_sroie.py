@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from scripts.utils import load_config, compute_metrics, save_metrics, parse_donut_output
@@ -43,6 +44,7 @@ def run_error_analysis(checkpoint_dir, test_dir, output_dir):
     field_errors = {"store_name": 0, "date": 0, "total": 0, "address": 0}
 
     preds_list, golds_list = [], []
+    inference_times_ms = []
     prompt_ids = processor.tokenizer("<s_sroie>", add_special_tokens=False, return_tensors="pt").input_ids.to(device)
 
     for rec in records:
@@ -55,6 +57,7 @@ def run_error_analysis(checkpoint_dir, test_dir, output_dir):
 
         with torch.no_grad():
             decoder_input_ids = prompt_ids.repeat(pixel_values.shape[0], 1)
+            start_time = time.perf_counter()
             generated = model.generate(
                 pixel_values,
                 decoder_input_ids=decoder_input_ids,
@@ -63,6 +66,8 @@ def run_error_analysis(checkpoint_dir, test_dir, output_dir):
                 eos_token_id=processor.tokenizer.eos_token_id,
                 num_beams=1,
             )
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            inference_times_ms.append(elapsed_ms)
 
         pred_text = processor.tokenizer.decode(generated[0], skip_special_tokens=False)
         pred = parse_donut_output(pred_text)
@@ -88,6 +93,7 @@ def run_error_analysis(checkpoint_dir, test_dir, output_dir):
 
     errors["error_counts"] = field_errors
     metrics = compute_metrics(preds_list, golds_list)
+    metrics["avg_inference_ms"] = round(sum(inference_times_ms) / len(inference_times_ms), 2) if inference_times_ms else None
     errors["metrics"] = metrics
 
     output_path = os.path.join(output_dir, "error_analysis.json")

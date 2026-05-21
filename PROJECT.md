@@ -26,6 +26,8 @@
 | Trường trích xuất | Tên cửa hàng · Ngày · Tổng tiền · Địa chỉ                      |
 | Nguồn        | [kaggle.com/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021](https://kaggle.com/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021) |
 
+> **Lưu ý về format Ground Truth:** Annotation gốc MC-OCR 2021 bao gồm cả cụm nhãn hiển thị trong giá trị trường (ví dụ: `date: "Ngày bán: 15/08/2020"`, `total: "TỔNG TIỀN PHẢI T.TOÁN 6.000"`). Đây là đặc thù của bộ dữ liệu gốc, không phải lỗi converter. Model cần học sinh lại toàn bộ chuỗi bao gồm prefix, và metric exact-match vẫn công bằng vì cả pred lẫn gold đều so sánh cùng format.
+
 ### 2.2 CORD v2 — Warm-up / Baseline
 
 | Thuộc tính   | Chi tiết                                                              |
@@ -44,13 +46,9 @@
 | Số lượng     | 626 ảnh receipt · 4 trường KIE đơn giản                              |
 | Vai trò      | Nhẹ, huấn luyện nhanh, kết quả so sánh rõ — dùng cho thí nghiệm E3 cross-dataset |
 
-### 2.4 SynthDoG-VI — Augmentation
+### 2.4 SynthDoG-VI — Augmentation [ĐÃ LOẠI BỎ KHỎI SCOPE]
 
-| Thuộc tính   | Chi tiết                                                              |
-|--------------|-----------------------------------------------------------------------|
-| Loại         | Sinh ảnh tổng hợp tự động (script có sẵn trong repo Donut)           |
-| Cách dùng    | Font tiếng Việt + template hóa đơn nội địa                           |
-| Vai trò      | Tăng data khi MC-OCR chỉ ~2.000 ảnh                                  |
+*Lưu ý: Đã loại bỏ phần này để giảm thiểu độ phức tạp của dự án và tập trung tối ưu hóa trên dữ liệu thực tế MC-OCR 2021.*
 
 ---
 
@@ -68,14 +66,14 @@
 
 - **Phương pháp:** Fine-tune `donut-base` trên CORD (warm-up) → MC-OCR 2021
 - **Kỹ thuật:** Thêm Vietnamese tokens vào decoder
-- **Augmentation:** SynthDoG-VI
+- **Augmentation:** Không dùng (sử dụng cấu hình mặc định của Donut)
 - **Kỳ vọng F1:** ≥ 0.80 (mục tiêu chính)
-- **Đáp ứng:** TC1 (mô hình chính) · TC2 (augmentation SynthDoG-VI) · TC3 (kiến trúc end-to-end)
+- **Đáp ứng:** TC1 (mô hình chính) · TC3 (kiến trúc end-to-end)
 
 ### E3 — Donut Fine-tune trên SROIE (Cross-dataset)
 
 - **Phương pháp:** Dùng lại Donut đã train ở E2 → fine-tune thêm trên SROIE 2019
-- **Phân tích:** So sánh khả năng generalize sang receipt tiếng Anh · Error analysis cross-lingual · Grad-CAM
+- **Phân tích:** So sánh khả năng generalize sang receipt tiếng Anh · Error analysis cross-lingual · Cross-Attention Visualization
 - **Đáp ứng:** TC4 (>2 thí nghiệm) · TC4 (error analysis cross-lingual)
 
 ---
@@ -90,7 +88,7 @@
 │  E2 (Mô hình chính):                                       │
 │    CORD v2 (warm-up)                                        │
 │      → donut-base fine-tune                                 │
-│        → MC-OCR 2021 + SynthDoG-VI                          │
+│        → MC-OCR 2021                                        │
 │          → Evaluate F1, Precision, Recall                   │
 │                                                             │
 │  E1 (Baseline):                                             │
@@ -101,7 +99,8 @@
 │  E3 (Cross-dataset):                                        │
 │    Donut (từ E2)                                            │
 │      → SROIE 2019 fine-tune thêm                            │
-│        → Error analysis + Grad-CAM                          │
+│        │ Error analysis + Cross-Attention                   │
+│        │ Visualization                                      │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -128,7 +127,7 @@
     │ F1 ≈ 0.60   │ │ F1 ≥ 0.80       │ │ F1 tiếng Anh     │
     │ –0.70       │ │ (mục tiêu)      │ │ Error analysis   │
     │ Baseline    │ │ Vietnamese +    │ │ cross-lingual    │
-    │ tham chiếu  │ │ Grad-CAM        │ │                  │
+    │ tham chiếu  │ │ Attention Viz   │ │                  │
     └──────┬──────┘ └────────┬────────┘ └────────┬───────────┘
            │                 │                    │
            └────────────┬────┘────────────────────┘
@@ -153,18 +152,27 @@ document-ai-vn/
 │   │   ├── raw/
 │   │   └── donut_format/    # Converted gt_parse JSON
 │   ├── cord-v2/             # CORD v2 từ HuggingFace
-│   ├── sroie/               # SROIE 2019
-│   └── synthdog-vi/         # Ảnh tổng hợp SynthDoG-VI
+│   └── sroie/               # SROIE 2019
 ├── notebooks/
 │   ├── 01_eda.ipynb         # EDA: phân phối, visualize mẫu
 │   └── 02_convert.ipynb     # Convert annotation → gt_parse
 ├── scripts/
-│   ├── convert_mcocr.py     # Script convert MC-OCR → Donut format
+│   ├── convert_mcocr.py     # Convert MC-OCR → Donut format
+│   ├── convert_sroie.py     # Convert SROIE → Donut format
+│   ├── download_data.py     # Tải dataset tự động
+│   ├── eda.py               # EDA dataset
 │   ├── train_donut.py       # Training script E2
-│   ├── eval.py              # Evaluation F1/P/R
-│   └── baseline_paddle.py   # E1 PaddleOCR baseline
+│   ├── train_donut_sroie.py # Training script E3 + error analysis
+│   ├── evaluate.py          # Evaluation F1/P/R
+│   ├── baseline_paddleocr.py # E1 PaddleOCR baseline
+│   ├── visualize_attention.py # Cross-attention visualization
+│   └── utils.py             # Hàm tiện ích dùng chung
 ├── configs/
-│   └── donut_mcocr.yaml     # Config huấn luyện
+│   ├── donut_cord.yaml      # Config warm-up CORD
+│   ├── donut_mcocr.yaml     # Config fine-tune MC-OCR
+│   └── donut_sroie.yaml     # Config cross-dataset SROIE
+├── tests/
+│   └── test_utils.py        # Unit tests cho utils.py
 ├── results/
 │   ├── e1_baseline/
 │   ├── e2_donut/
@@ -199,7 +207,7 @@ document-ai-vn/
 | Thí nghiệm | Dataset train       | Dataset test | F1    | Precision | Recall | Inference (ms) |
 |-------------|---------------------|-------------|-------|-----------|--------|----------------|
 | E1          | MC-OCR 2021         | MC-OCR test | —     | —         | —      | —              |
-| E2          | CORD + MC-OCR + Aug | MC-OCR test | —     | —         | —      | —              |
+| E2          | CORD + MC-OCR       | MC-OCR test | —     | —         | —      | —              |
 | E3          | E2 + SROIE          | SROIE test  | —     | —         | —      | —              |
 
 ---

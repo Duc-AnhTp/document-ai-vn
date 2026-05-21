@@ -6,7 +6,7 @@ import json
 import os
 import re
 import unicodedata
-from pathlib import Path
+
 
 import yaml
 from PIL import Image
@@ -44,7 +44,7 @@ def normalize_field_value(field: str, text: str) -> str:
 
     if field == "total":
         # Gỡ hậu tố tiền tệ và khoảng trắng để so sánh gần hơn về giá trị hiển thị.
-        text = re.sub(r"\b(vnd|vnđ|dong|đ)\b", "", text)
+        text = re.sub(r"(vnd|vnđ|dong|đ)", "", text)
         text = re.sub(r"[,\.\s]", "", text)
         return text
 
@@ -59,7 +59,7 @@ def normalize_field_value(field: str, text: str) -> str:
         }
         for src, dst in replacements.items():
             text = text.replace(src, dst)
-        text = re.sub(r"[^0-9a-z\s]", " ", text)
+        text = re.sub(r"[^\w\s]", " ", text)
         return " ".join(text.split())
 
     return text
@@ -137,7 +137,7 @@ def parse_donut_output(generated_text: str, task_prompt: str = "") -> dict:
     Donut sinh text dạng:
     <s_mcocr><s_store_name>ABC</s_store_name><s_date>01/01</s_date>...
     """
-    import re
+
 
     result = {}
     for field in FIELDS:

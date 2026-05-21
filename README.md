@@ -143,7 +143,7 @@ python scripts/download_data.py --dataset sroie --output data/
 Lưu ý:
 - `MC-OCR` và `SROIE` cần `kaggle` CLI nếu muốn tải tự động.
 - Nếu `SROIE` không tải được tự động, hãy giải nén thủ công vào `data/sroie/`.
-- SROIE cần đúng cấu trúc `data/sroie/img/` và `data/sroie/key/`.
+- SROIE cần đúng cấu trúc `data/sroie/SROIE2019/train/img/` + `train/entities/` và `test/img/` + `test/entities/`.
 
 ### 3. Convert dữ liệu
 
@@ -221,7 +221,7 @@ Kết quả mong đợi:
 - Thiếu `kaggle.json`:
   - Đặt file vào `C:\Users\<ten_user>\.kaggle\kaggle.json`
 - SROIE sai cấu trúc:
-  - Kiểm tra lại `data/sroie/img/` và `data/sroie/key/`
+  - Kiểm tra lại `data/sroie/SROIE2019/train/img/` + `train/entities/` và `test/img/` + `test/entities/`
 - MC-OCR map sai CSV:
   - Chạy convert không dùng `--force` để kiểm tra sample record
 - Không có GPU hoặc thiếu VRAM:

@@ -152,20 +152,20 @@ def validate(model, processor, dataloader, device, task_prompt="", metric_mode="
         outputs = model(pixel_values=pixel_values, labels=labels)
         total_loss += outputs.loss.item()
 
-        batch_size = pixel_values.shape[0]
-        decoder_input_ids = prompt_ids.repeat(batch_size, 1)
-
-        # Generate
-        generated = model.generate(
-            pixel_values,
-            decoder_input_ids=decoder_input_ids,
-            max_length=model.config.decoder.max_position_embeddings,
-            pad_token_id=processor.tokenizer.pad_token_id,
-            eos_token_id=processor.tokenizer.eos_token_id,
-            num_beams=1,
-        )
-
         if metric_mode == "kie_f1":
+            batch_size = pixel_values.shape[0]
+            decoder_input_ids = prompt_ids.repeat(batch_size, 1)
+
+            # Generate
+            generated = model.generate(
+                pixel_values,
+                decoder_input_ids=decoder_input_ids,
+                max_length=model.config.decoder.max_position_embeddings,
+                pad_token_id=processor.tokenizer.pad_token_id,
+                eos_token_id=processor.tokenizer.eos_token_id,
+                num_beams=1,
+            )
+
             for gen, lab in zip(generated, labels):
                 pred_text = processor.tokenizer.decode(gen, skip_special_tokens=False)
                 pred_dict = parse_donut_output(pred_text, task_prompt)
@@ -212,8 +212,14 @@ def run_training(config):
 
     if "dataset_name" in config["data"]:
         # HuggingFace dataset (CORD)
-        from datasets import load_dataset
-        ds = load_dataset(config["data"]["dataset_name"])
+        from datasets import load_dataset, load_from_disk
+        local_path = config["data"].get("local_path", "")
+        if local_path and os.path.exists(local_path):
+            print(f"[INFO] Loading dataset from local: {local_path}")
+            ds = load_from_disk(local_path)
+        else:
+            print(f"[INFO] Loading dataset from HuggingFace: {config['data']['dataset_name']}")
+            ds = load_dataset(config["data"]["dataset_name"])
         train_ds = DonutHFDataset(ds["train"], processor, max_length, task_prompt)
         val_ds = DonutHFDataset(ds["validation"], processor, max_length, task_prompt)
     else:

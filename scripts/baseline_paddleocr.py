@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sys
+import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from scripts.utils import compute_metrics, save_metrics, load_metadata, extract_gt_parse
@@ -121,6 +122,7 @@ def main():
     preds = []
     golds = []
     predictions = []
+    inference_times_ms = []
 
     for i, rec in enumerate(records):
         img_path = os.path.join(args.test_dir, rec["file_name"])
@@ -131,11 +133,15 @@ def main():
             preds.append({"store_name": "", "date": "", "total": "", "address": ""})
             continue
 
+        start_time = time.perf_counter()
         # OCR
         text_lines = run_paddleocr_on_image(ocr, img_path)
 
         # Rule-based extraction
         pred = extract_fields_rule(text_lines)
+        elapsed_ms = (time.perf_counter() - start_time) * 1000
+        inference_times_ms.append(elapsed_ms)
+        
         preds.append(pred)
 
         predictions.append({
@@ -152,6 +158,7 @@ def main():
     metrics = compute_metrics(preds, golds)
     metrics["experiment"] = "E1_PaddleOCR_Baseline"
     metrics["num_samples"] = len(records)
+    metrics["avg_inference_ms"] = round(sum(inference_times_ms) / len(inference_times_ms), 2) if inference_times_ms else None
 
     os.makedirs(args.output, exist_ok=True)
     save_metrics(metrics, os.path.join(args.output, "metrics.json"))

@@ -2,8 +2,10 @@
 Convert annotation SROIE 2019 -> format gt_parse cua Donut.
 
 SROIE structure expected:
-    data/sroie/img/
-    data/sroie/key/
+    data/sroie/SROIE2019/train/img/
+    data/sroie/SROIE2019/train/entities/
+    data/sroie/SROIE2019/test/img/
+    data/sroie/SROIE2019/test/entities/
 
 Su dung:
     python scripts/convert_sroie.py --input data/sroie/ --output data/sroie/donut_format/
@@ -17,12 +19,14 @@ import shutil
 import numpy as np
 
 
-def split_data(records, ratios=(0.8, 0.1, 0.1), seed=42):
+def split_train_val(records, val_ratio=0.1, seed=42):
+    """Tach val tu train, giu nguyen thu tu reproducible."""
     np.random.seed(seed)
     idx = np.random.permutation(len(records))
-    n1 = int(len(records) * ratios[0])
-    n2 = int(len(records) * ratios[1])
-    return [records[i] for i in idx[:n1]], [records[i] for i in idx[n1:n1+n2]], [records[i] for i in idx[n1+n2:]]
+    n_val = int(len(records) * val_ratio)
+    val_idx = idx[:n_val]
+    train_idx = idx[n_val:]
+    return [records[i] for i in train_idx], [records[i] for i in val_idx]
 
 
 def write_split(records, output_dir, name):
@@ -60,7 +64,8 @@ def main():
     if os.path.exists(os.path.join(sroie_root, "SROIE2019")):
         sroie_root = os.path.join(sroie_root, "SROIE2019")
         
-    records = []
+    train_records = []
+    test_records = []
     failed_files = []
     
     for split in ["train", "test"]:
@@ -76,24 +81,40 @@ def main():
             with open(file_path, "r", encoding="utf-8") as f:
                 try:
                     data = json.load(f)
-                    data["file_name"] = txt_file.replace(".txt", ".jpg")
+                    base_name = os.path.splitext(txt_file)[0]
+                    # Try multiple image extensions
+                    img_name = None
+                    for ext in [".jpg", ".jpeg", ".png"]:
+                        candidate = base_name + ext
+                        if os.path.exists(os.path.join(img_dir, candidate)):
+                            img_name = candidate
+                            break
+                    if img_name is None:
+                        img_name = base_name + ".jpg"  # fallback
+                    data["file_name"] = img_name
                     data["_img_dir"] = img_dir
-                    records.append(data)
+                    if split == "train":
+                        train_records.append(data)
+                    else:
+                        test_records.append(data)
                 except Exception as e:
                     failed_files.append({"file": file_path, "error": str(e)})
 
-    if not records:
+    all_count = len(train_records) + len(test_records)
+    if all_count == 0:
         print(f"[LOI] Khong tim thay du lieu trong {sroie_root} (Can cau truc SROIE2019/train/img va entities)")
         return
                 
-    print(f"[INFO] Tong hop: {len(records)} records")
+    print(f"[INFO] Tong hop: {all_count} records (official train={len(train_records)}, official test={len(test_records)})")
     if failed_files:
         print(f"[WARN] Bo qua {len(failed_files)} file parse loi")
         for item in failed_files[:10]:
             print(f"  - {item['file']}: {item['error']}")
-            
-    train, val, test = split_data(records)
-    print(f"[INFO] Split: train={len(train)} val={len(val)} test={len(test)}")
+    
+    # Giu nguyen official test set, chi tach val tu official train
+    train, val = split_train_val(train_records, val_ratio=0.1)
+    test = test_records
+    print(f"[INFO] Split: train={len(train)} val={len(val)} test={len(test)} (official test giu nguyen)")
 
     for sname, sdata in [("train", train), ("val", val), ("test", test)]:
         write_split(sdata, args.output, sname)
