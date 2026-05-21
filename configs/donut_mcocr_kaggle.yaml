@@ -3,6 +3,7 @@ experiment: "mcocr_finetune_kaggle"
 model:
   pretrained: "/kaggle/working/results/e2_donut/checkpoints/cord_warmup"
   max_length: 768
+  image_size: [1280, 960]
   task_prompt: "<s_mcocr>"
   added_tokens:
     - "<s_mcocr>"

@@ -273,6 +273,12 @@ def run_training(config):
     processor = DonutProcessor.from_pretrained(load_path)
     model = VisionEncoderDecoderModel.from_pretrained(load_path)
 
+    image_size = config["model"].get("image_size")
+    if image_size:
+        processor.image_processor.size = {"height": image_size[0], "width": image_size[1]}
+        model.config.encoder.image_size = image_size
+        print(f"[INFO] Image size overridden to {image_size}")
+
     if hasattr(model, "gradient_checkpointing_enable"):
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
