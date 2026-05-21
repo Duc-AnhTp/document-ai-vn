@@ -1,7 +1,7 @@
 # Core Donut training
 torch>=2.0
 transformers>=4.30
-donut-python
+# donut-python  # Not used directly by codebase, commented out to prevent Kaggle environment conflicts
 datasets
 
 # Data and utilities

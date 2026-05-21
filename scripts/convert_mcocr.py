@@ -10,6 +10,7 @@ import csv
 import json
 import os
 import shutil
+import sys
 import unicodedata
 
 import numpy as np
@@ -182,13 +183,17 @@ def main():
         print(json.dumps(records[0], indent=2, ensure_ascii=False))
         print("---------------------\n")
 
-    if not args.force:
+    if not args.force and sys.stdin.isatty():
         print(f"[INFO] Selected CSV: {os.path.basename(csv_path)}")
         print(f"[INFO] Final mapping: {mapping}")
         ans = input("Continue with this mapping? (y/n): ")
         if ans.lower() != "y":
             print("Cancelled.")
             return
+    else:
+        print(f"[INFO] Selected CSV: {os.path.basename(csv_path)}")
+        print(f"[INFO] Final mapping: {mapping}")
+        print("[INFO] Non-interactive environment or --force enabled. Continuing automatically...")
 
     train, val, test = split_data(records, tuple(args.split_ratio))
     print(f"[INFO] Split: train={len(train)} val={len(val)} test={len(test)}")

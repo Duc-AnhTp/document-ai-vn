@@ -92,6 +92,49 @@ Checkpoint duoc luu tai:
 results/e2_donut/checkpoints/mcocr
 ```
 
+### Train tren Kaggle T4 x2
+
+Kaggle nen dung 2 config rieng vi output phai nam trong `/kaggle/working` va data thuong nam trong `/kaggle/input`.
+
+1. Bat accelerator `GPU T4 x2`.
+2. Upload repo nay vao Kaggle Notebook, hoac clone repo trong notebook.
+3. Tao Kaggle Dataset chua MC-OCR Donut format theo cau truc:
+
+```text
+/kaggle/input/mcocr-donut-format/donut_format/
+  train/metadata.jsonl
+  val/metadata.jsonl
+  test/metadata.jsonl
+```
+
+Neu dataset slug khac `mcocr-donut-format`, sua cac duong dan `data.*_dir` trong `configs/donut_mcocr_kaggle.yaml`.
+
+Chay warm-up CORD:
+
+```bash
+python scripts/train_donut.py --config configs/donut_cord_kaggle.yaml
+```
+
+Chay fine-tune MC-OCR:
+
+```bash
+python scripts/train_donut.py --config configs/donut_mcocr_kaggle.yaml
+```
+
+Neu session bi ngat, chay lai dung lenh cu. Script se resume tu:
+
+```text
+/kaggle/working/results/e2_donut/checkpoints/<experiment>/last
+```
+
+Co the override nhanh so epoch hoac batch size:
+
+```bash
+python scripts/train_donut.py --config configs/donut_mcocr_kaggle.yaml --epochs 15 --batch-size 4
+```
+
+Script tu dong bat mixed precision `fp16`, `pin_memory`, `num_workers=2`, va `DataParallel` khi Kaggle cap 2 GPU.
+
 ## Evaluate
 
 ```powershell

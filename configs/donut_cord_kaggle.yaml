@@ -1,0 +1,28 @@
+experiment: "cord_warmup_kaggle"
+
+model:
+  pretrained: "naver-clova-ix/donut-base"
+  max_length: 768
+  task_prompt: "<s_cord-v2>"
+
+data:
+  dataset_name: "naver-clova-ix/cord-v2"
+  local_path: "data/cord-v2"
+
+training:
+  epochs: 3
+  batch_size: 4
+  learning_rate: 5e-5
+  gradient_accumulation: 4
+  metric_mode: "loss_only"
+  selection_metric: "val_loss"
+  early_stopping_patience: 2
+  precision: "fp16"
+  multi_gpu: true
+  num_workers: 2
+  pin_memory: true
+  resume: true
+
+output:
+  checkpoint_dir: "/kaggle/working/results/e2_donut/checkpoints/cord_warmup"
+  log_file: "/kaggle/working/results/e2_donut/cord_warmup_log.csv"
