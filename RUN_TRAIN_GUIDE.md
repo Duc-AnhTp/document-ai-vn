@@ -36,8 +36,15 @@ Thay vì tự tải xuống bằng script rất mất thời gian, hãy tận d�
 1. Nhấn nút **Add Input** (hoặc **Add Data**) ở góc trên bên phải Notebook.
 2. Tìm kiếm dataset: `vietnamese-receipts-mc-ocr-2021` (của tác giả `domixi1989`).
 3. Nhấn **Add** để thêm vào Notebook.
-4. Đường dẫn chứa ảnh raw và file CSV lúc này sẽ là:
-   `/kaggle/input/vietnamese-receipts-mc-ocr-2021`
+4. Đường dẫn chứa ảnh raw và file CSV lúc này thường sẽ là:
+   `/kaggle/input/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021`
+
+> [!WARNING]
+> Nếu bạn gặp lỗi `FileNotFoundError: No such file or directory` ở bước này, hãy chạy lệnh sau trong một cell mới để kiểm tra tên thư mục thực tế của dataset trong Kaggle:
+> ```bash
+> !ls /kaggle/input
+> ```
+> Kết quả lệnh trên sẽ hiển thị tên thư mục chính xác (ví dụ: `vietnamese-receipts-mc-ocr-2021` hoặc `mcocr2021`). Hãy thay thế tên thư mục này vào tham số `--input` ở Bước 4.
 
 ### Bước 3: Đồng bộ mã nguồn từ nhánh `kaggle-donut-traning` lên Kaggle
 Có 2 cách để đưa code lên Kaggle:
@@ -55,13 +62,16 @@ Tạo một ô code mới (Code cell) trong Notebook để cài đặt thư vi�
 # 1. Cài đặt các thư viện cần thiết
 !pip install -r requirements.txt
 
-# 2. Tạo thư mục chứa dữ liệu đầu ra sau khi convert
+# 2. Kiểm tra các thư mục trong input để lấy đường dẫn chính xác
 import os
+print("Các thư mục hiện có trong /kaggle/input/:", os.listdir("/kaggle/input"))
+
+# 3. Tạo thư mục chứa dữ liệu đầu ra sau khi convert
 os.makedirs("/kaggle/working/data/mc-ocr/donut_format", exist_ok=True)
 
-# 3. Chạy script convert dữ liệu (sẽ tự động chạy không cần hỏi xác nhận)
+# 4. Chạy script convert dữ liệu (sửa lại tên thư mục input cho khớp với bước 2 nếu khác)
 !python scripts/convert_mcocr.py \
-    --input /kaggle/input/vietnamese-receipts-mc-ocr-2021 \
+    --input /kaggle/input/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021 \
     --output /kaggle/working/data/mc-ocr/donut_format \
     --split-ratio 0.8 0.1 0.1
 ```
