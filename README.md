@@ -1,129 +1,17 @@
-# 🧾 Document AI — Trích xuất Thông tin Biên lai Tiếng Việt
+# Document AI VN - Donut Fine-tuning cho bien lai tieng Viet
 
-> Đồ án môn **Thị giác Máy tính** — HUCE
->
-> Fine-tune mô hình [Donut](https://arxiv.org/abs/2111.15664) (OCR-free Document Understanding Transformer) để trích xuất thông tin từ biên lai chụp điện thoại tiếng Việt.
+> Do an thi giac may tinh: fine-tune mo hinh Donut de trich xuat thong tin tu anh bien lai tieng Viet trong MC-OCR 2021.
 
-## Sơ đồ kiến trúc
+Nhanh gon: nhanh `main` chi giu baseline Donut-only. Cac huong pipeline khac va so sanh voi nhanh moi duoc thuc hien tren `new-document-ai`.
 
-![Kiến trúc tổng thể](docs/architecture.png)
+## Muc tieu
 
-## Thí nghiệm
+- Warm-up Donut tren CORD v2.
+- Fine-tune tiep tren MC-OCR 2021.
+- Evaluate tren MC-OCR test split voi 4 truong KIE:
+  `store_name`, `date`, `total`, `address`.
 
-| # | Thí nghiệm | Phương pháp | Dataset |
-|---|------------|-------------|---------|
-| E1 | Baseline | PaddleOCR + regex/rule | MC-OCR 2021 |
-| E2 | **Mô hình chính** | Donut fine-tune | CORD (warm-up) → MC-OCR |
-| E3 | Cross-dataset | Donut (từ E2) fine-tune thêm | SROIE 2019 |
-
-## Cài đặt
-
-```bash
-pip install -r requirements.txt
-```
-
-## Tải dữ liệu
-
-```bash
-python scripts/download_data.py --dataset all --output data/
-```
-
-Hoặc tải riêng:
-```bash
-python scripts/download_data.py --dataset mcocr --output data/
-python scripts/download_data.py --dataset cord --output data/
-python scripts/download_data.py --dataset sroie --output data/
-```
-
-## Convert annotation
-
-```bash
-python scripts/convert_mcocr.py \
-  --input data/mc-ocr/raw/ \
-  --output data/mc-ocr/donut_format/ \
-  --split-ratio 0.8 0.1 0.1
-```
-
-SROIE cần convert riêng trước khi chạy E3:
-```bash
-python scripts/convert_sroie.py \
-  --input data/sroie/ \
-  --output data/sroie/donut_format/
-```
-
-## Chạy thí nghiệm
-
-### E1 — PaddleOCR Baseline
-```bash
-python scripts/baseline_paddleocr.py \
-  --test-dir data/mc-ocr/donut_format/test/ \
-  --output results/e1_baseline/
-```
-
-### E2 — Donut Fine-tune
-```bash
-# Warm-up trên CORD v2
-python scripts/train_donut.py --config configs/donut_cord.yaml
-
-# Fine-tune trên MC-OCR
-python scripts/train_donut.py --config configs/donut_mcocr.yaml
-
-# Evaluate
-python scripts/evaluate.py \
-  --checkpoint results/e2_donut/checkpoints/mcocr \
-  --test-dir data/mc-ocr/donut_format/test/ \
-  --output results/e2_donut/metrics.json
-```
-
-`metrics.json` hiện lưu thêm `avg_inference_ms` để đối chiếu bảng so sánh trong `PROJECT.md`.
-
-### E3 — Cross-dataset SROIE
-```bash
-python scripts/convert_sroie.py --input data/sroie/ --output data/sroie/donut_format/
-
-python scripts/train_donut_sroie.py --config configs/donut_sroie.yaml
-```
-
-## Kết quả
-
-| Thí nghiệm | F1 | Precision | Recall |
-|-------------|-----|-----------|--------|
-| E1 (PaddleOCR) | — | — | — |
-| E2 (Donut) | — | — | — |
-| E3 (SROIE) | — | — | — |
-
-> Kết quả sẽ được cập nhật sau khi chạy thí nghiệm.
-
-## Cấu trúc thư mục
-
-```
-document-ai-vn/
-├── configs/          # Config YAML cho từng thí nghiệm
-├── scripts/          # Code chính (train, evaluate, baseline)
-├── notebooks/        # Demo & trình bày kết quả
-├── data/             # Dataset (không commit, tải bằng script)
-├── results/          # Kết quả thí nghiệm (metrics commit, checkpoints không)
-├── docs/             # Tài liệu bổ sung
-├── PROJECT.md        # Mô tả chi tiết dự án
-└── README.md         # File này
-```
-
-## Tham khảo
-
-- [Donut: OCR-free Document Understanding Transformer](https://arxiv.org/abs/2111.15664) — Kim et al., 2022
-- [Donut GitHub](https://github.com/clovaai/donut)
-- [MC-OCR 2021](https://kaggle.com/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021)
-- [CORD v2](https://huggingface.co/datasets/naver-clova-ix/cord-v2)
-- [SROIE 2019](https://rrc.cvc.uab.es/?ch=13)
-- [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
-
----
-
-## Hướng dẫn chạy nhanh
-
-Nếu bạn chỉ muốn chạy project theo thứ tự ít rối nhất, hãy làm như sau trong `Windows PowerShell`.
-
-### 1. Tạo môi trường và cài thư viện
+## Cai dat
 
 ```powershell
 python -m venv .venv
@@ -132,97 +20,125 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 2. Tải dữ liệu
+Neu dung GPU, hay cai ban PyTorch phu hop voi CUDA tren may truoc khi cai cac goi con lai.
+
+## Chuan bi du lieu
+
+`data/` khong commit vao git. Co the dung script de tai lai va build lai processed data.
+
+### 1. Tai MC-OCR va CORD
 
 ```powershell
 python scripts/download_data.py --dataset mcocr --output data/
 python scripts/download_data.py --dataset cord --output data/
-python scripts/download_data.py --dataset sroie --output data/
 ```
 
-Lưu ý:
-- `MC-OCR` và `SROIE` cần `kaggle` CLI nếu muốn tải tự động.
-- Nếu `SROIE` không tải được tự động, hãy giải nén thủ công vào `data/sroie/`.
-- SROIE cần đúng cấu trúc `data/sroie/SROIE2019/train/img/` + `train/entities/` và `test/img/` + `test/entities/`.
+MC-OCR tai tu Kaggle, can cai `kaggle` CLI va dat credential tai `C:\Users\<user>\.kaggle\kaggle.json`.
 
-### 3. Convert dữ liệu
+### 2. Convert MC-OCR sang Donut format
 
 ```powershell
 python scripts/convert_mcocr.py --input data/mc-ocr/raw/ --output data/mc-ocr/donut_format/ --split-ratio 0.8 0.1 0.1
-python scripts/convert_sroie.py --input data/sroie/ --output data/sroie/donut_format/
 ```
 
-Lưu ý:
-- `convert_mcocr.py` sẽ in sample record và hỏi xác nhận mapping cột.
-- Chỉ dùng `--force` khi bạn chắc mapping đã đúng.
+Output chuan:
 
-### 4. Kiểm tra dữ liệu đã ổn chưa
+```text
+data/mc-ocr/donut_format/
+  train/
+    metadata.jsonl
+    *.jpg
+  val/
+    metadata.jsonl
+    *.jpg
+  test/
+    metadata.jsonl
+    *.jpg
+```
+
+Moi dong `metadata.jsonl` co `file_name` va `ground_truth`, trong do `ground_truth` la chuoi JSON long chua `gt_parse`.
+
+### 3. Kiem tra nhanh du lieu
 
 ```powershell
 python scripts/eda.py --data-dir data/mc-ocr/donut_format/ --output docs/eda_figures/
 ```
 
-Kết quả mong đợi:
-- `docs/eda_figures/` có các file như `split_counts.png`, `field_distribution.png`, `samples.png`.
+Lenh nay tao cac hinh thong ke split, field coverage, do dai text, kich thuoc anh va mau annotation.
 
-### 5. Chạy baseline E1
+## Train Donut
 
-```powershell
-python scripts/baseline_paddleocr.py --test-dir data/mc-ocr/donut_format/test/ --output results/e1_baseline/
-```
-
-Kết quả mong đợi:
-- `results/e1_baseline/metrics.json`
-- `results/e1_baseline/predictions.json`
-
-### 6. Chạy Donut E2
+### 1. Warm-up CORD v2
 
 ```powershell
 python scripts/train_donut.py --config configs/donut_cord.yaml
-python scripts/train_donut.py --config configs/donut_mcocr.yaml
-python scripts/evaluate.py --checkpoint results/e2_donut/checkpoints/mcocr --test-dir data/mc-ocr/donut_format/test/ --output results/e2_donut/metrics.json
 ```
 
-Lưu ý:
-- Warm-up CORD hiện chọn checkpoint theo `val_loss`.
-- `metrics.json` của E2 có thêm `avg_inference_ms`.
+Checkpoint duoc luu tai:
 
-Kết quả mong đợi:
-- `results/e2_donut/checkpoints/cord_warmup`
-- `results/e2_donut/checkpoints/mcocr`
-- `results/e2_donut/training_log.csv`
-- `results/e2_donut/metrics.json`
+```text
+results/e2_donut/checkpoints/cord_warmup
+```
 
-### 7. Chạy E3
+### 2. Fine-tune MC-OCR
 
 ```powershell
-python scripts/train_donut_sroie.py --config configs/donut_sroie.yaml
+python scripts/train_donut.py --config configs/donut_mcocr.yaml
 ```
 
-Kết quả mong đợi:
-- `results/e3_cross/checkpoints`
-- `results/e3_cross/training_log.csv`
-- `results/e3_cross/error_analysis.json`
+Checkpoint duoc luu tai:
 
-### Cách nhớ nhanh
+```text
+results/e2_donut/checkpoints/mcocr
+```
 
-- Bước 1: cài thư viện
-- Bước 2: tải data
-- Bước 3: convert data
-- Bước 4: kiểm tra data
-- Bước 5: chạy E1
-- Bước 6: chạy E2
-- Bước 7: chạy E3
+## Evaluate
 
-### Lỗi thường gặp
+```powershell
+python scripts/evaluate.py --checkpoint results/e2_donut/checkpoints/mcocr --test-dir data/mc-ocr/donut_format/test --output results/e2_donut/metrics.json --task-prompt "<s_mcocr>"
+```
 
-- Không tìm thấy `kaggle`:
-  - Chạy `pip install kaggle`
-- Thiếu `kaggle.json`:
-  - Đặt file vào `C:\Users\<ten_user>\.kaggle\kaggle.json`
-- SROIE sai cấu trúc:
-  - Kiểm tra lại `data/sroie/SROIE2019/train/img/` + `train/entities/` và `test/img/` + `test/entities/`
-- MC-OCR map sai CSV:
-  - Chạy convert không dùng `--force` để kiểm tra sample record
-- Không có GPU hoặc thiếu VRAM:
-  - Có thể test bằng CPU, nhưng train Donut sẽ chậm
+Ket qua gom:
+
+- `overall.precision`
+- `overall.recall`
+- `overall.f1`
+- `per_field`
+- `avg_inference_ms`
+
+## Cau truc repo
+
+```text
+document-ai-vn/
+  configs/
+    donut_cord.yaml
+    donut_mcocr.yaml
+  scripts/
+    convert_mcocr.py
+    download_data.py
+    eda.py
+    evaluate.py
+    train_donut.py
+    utils.py
+  docs/
+    data_format.md
+    experiment_notes.md
+    eda_figures/
+  notebooks/
+  results/
+  PROJECT.md
+  README.md
+  requirements.txt
+```
+
+## Ghi chu ve pham vi
+
+- `main` chi giu pipeline Donut-only.
+- Cac pipeline khac dung de so sanh se nam tren nhanh rieng, uu tien `new-document-ai`.
+
+## Tham khao
+
+- [Donut: OCR-free Document Understanding Transformer](https://arxiv.org/abs/2111.15664)
+- [Donut GitHub](https://github.com/clovaai/donut)
+- [CORD v2](https://huggingface.co/datasets/naver-clova-ix/cord-v2)
+- [MC-OCR 2021](https://kaggle.com/datasets/domixi1989/vietnamese-receipts-mc-ocr-2021)

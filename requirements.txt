@@ -1,16 +1,11 @@
-# Core
+# Core Donut training
 torch>=2.0
 transformers>=4.30
 donut-python
 datasets
 
-# OCR baseline
-paddleocr
-paddlepaddle
-
-# Utils
+# Data and utilities
 Pillow
-opencv-python
 matplotlib
 seaborn
 pandas
@@ -21,6 +16,6 @@ tqdm
 # Evaluation
 scikit-learn
 
-# Notebook
+# Notebooks
 jupyter
 ipywidgets

@@ -1,40 +1,32 @@
-# Ghi chú Thí nghiệm
+# Experiment notes
 
-## E1 — PaddleOCR Baseline
+Nhanh `main` chi ghi chu cac thi nghiem Donut-only.
 
-- **Ngày chạy:** _chưa chạy_
-- **Hyperparameters:** N/A (rule-based)
-- **Ghi chú:** ...
-- **Kết quả:** Xem `results/e1_baseline/metrics.json`
+## Donut warm-up tren CORD v2
 
----
+- Config: `configs/donut_cord.yaml`
+- Pretrained: `naver-clova-ix/donut-base`
+- Dataset: `naver-clova-ix/cord-v2`
+- Selection metric: `val_loss`
+- Output checkpoint: `results/e2_donut/checkpoints/cord_warmup`
+- Log: `results/e2_donut/cord_warmup_log.csv`
+- Trang thai: _chua cap nhat ket qua chinh thuc_
 
-## E2 — Donut Fine-tune (Mô hình chính)
+## Donut fine-tune tren MC-OCR
 
-### Warm-up CORD
-- **Config:** `configs/donut_cord.yaml`
-- **Epochs:** 3
-- **Ghi chú:** ...
+- Config: `configs/donut_mcocr.yaml`
+- Pretrained: `results/e2_donut/checkpoints/cord_warmup`
+- Dataset: `data/mc-ocr/donut_format/`
+- Selection metric: `f1`
+- Output checkpoint: `results/e2_donut/checkpoints/mcocr`
+- Log: `results/e2_donut/training_log.csv`
+- Metrics: `results/e2_donut/metrics.json`
+- Trang thai: _chua cap nhat ket qua chinh thuc_
 
-### Fine-tune MC-OCR
-- **Config:** `configs/donut_mcocr.yaml`
-- **Epochs:** 30 (early stopping patience=5)
-- **Best epoch:** _chưa chạy_
-- **Ghi chú:** ...
-- **Kết quả:** Xem `results/e2_donut/metrics.json`
+## Checklist truoc khi train
 
----
-
-## E3 — Cross-dataset SROIE
-
-- **Config:** `configs/donut_sroie.yaml`
-- **Ghi chú:** ...
-- **Error analysis:** Xem `results/e3_cross/error_analysis.json`
-
----
-
-## Lỗi thường gặp & cách fix
-
-| Lỗi | Nguyên nhân | Cách fix |
-|-----|-------------|----------|
-| ... | ... | ... |
+- `data/cord-v2/` da co HuggingFace dataset cache.
+- `data/mc-ocr/donut_format/train/metadata.jsonl` ton tai.
+- `data/mc-ocr/donut_format/val/metadata.jsonl` ton tai.
+- `data/mc-ocr/donut_format/test/metadata.jsonl` ton tai.
+- Da chay EDA va kiem tra sample annotation hop ly.

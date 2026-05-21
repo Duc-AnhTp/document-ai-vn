@@ -1,32 +1,26 @@
-"""
-Hàm tiện ích dùng chung cho toàn bộ dự án Document AI KIE.
-"""
+"""Shared utilities for Donut-only KIE training and evaluation."""
 
 import json
 import os
 import re
 import unicodedata
 
-
-import yaml
 from PIL import Image
 
-
-# ── Config ──────────────────────────────────────────────────────────────────
-
-def load_config(yaml_path: str) -> dict:
-    """Đọc file YAML config → dict."""
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
-
-
-# ── Metrics ─────────────────────────────────────────────────────────────────
 
 FIELDS = ["store_name", "date", "total", "address"]
 
 
+def load_config(yaml_path: str) -> dict:
+    """Load a YAML config file."""
+    import yaml
+
+    with open(yaml_path, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
 def normalize_text(text: str) -> str:
-    """Chuẩn hoá text để so sánh: lowercase, bỏ khoảng trắng thừa."""
+    """Normalize text before field comparison."""
     if not text:
         return ""
     text = unicodedata.normalize("NFC", str(text).strip().lower())
@@ -34,7 +28,7 @@ def normalize_text(text: str) -> str:
 
 
 def normalize_field_value(field: str, text: str) -> str:
-    """Chuẩn hoá theo từng field để metric bớt phụ thuộc format trình bày."""
+    """Apply field-specific normalization for metric comparison."""
     text = normalize_text(text)
 
     if field == "date":
@@ -43,8 +37,7 @@ def normalize_field_value(field: str, text: str) -> str:
         return text
 
     if field == "total":
-        # Gỡ hậu tố tiền tệ và khoảng trắng để so sánh gần hơn về giá trị hiển thị.
-        text = re.sub(r"(vnd|vnđ|dong|đ)", "", text)
+        text = re.sub(r"(vnd|vnd|dong|d)", "", text)
         text = re.sub(r"[,\.\s]", "", text)
         return text
 
@@ -66,20 +59,7 @@ def normalize_field_value(field: str, text: str) -> str:
 
 
 def compute_metrics(preds: list[dict], golds: list[dict]) -> dict:
-    """
-    Tính F1 / Precision / Recall cho KIE fields.
-
-    Parameters
-    ----------
-    preds : list[dict]
-        Mỗi dict có keys = FIELDS, values = chuỗi trích xuất.
-    golds : list[dict]
-        Ground truth cùng format.
-
-    Returns
-    -------
-    dict với overall và per_field metrics.
-    """
+    """Compute macro precision, recall and F1 across KIE fields."""
     per_field = {}
 
     for field in FIELDS:
@@ -105,7 +85,6 @@ def compute_metrics(preds: list[dict], golds: list[dict]) -> dict:
             "f1": round(f1, 4),
         }
 
-    # Macro average
     macro_p = sum(v["precision"] for v in per_field.values()) / len(FIELDS)
     macro_r = sum(v["recall"] for v in per_field.values()) / len(FIELDS)
     macro_f1 = sum(v["f1"] for v in per_field.values()) / len(FIELDS)
@@ -121,24 +100,15 @@ def compute_metrics(preds: list[dict], golds: list[dict]) -> dict:
 
 
 def save_metrics(metrics: dict, path: str):
-    """Lưu metrics ra JSON."""
+    """Save metrics to JSON."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(metrics, f, ensure_ascii=False, indent=2)
-    print(f"Đã lưu metrics → {path}")
+    print(f"Saved metrics to {path}")
 
-
-# ── Donut output parsing ───────────────────────────────────────────────────
 
 def parse_donut_output(generated_text: str, task_prompt: str = "") -> dict:
-    """
-    Parse output decoder Donut → dict các trường KIE.
-
-    Donut sinh text dạng:
-    <s_mcocr><s_store_name>ABC</s_store_name><s_date>01/01</s_date>...
-    """
-
-
+    """Parse Donut decoder text into the four-field KIE schema."""
     result = {}
     for field in FIELDS:
         pattern = rf"<s_{field}>(.*?)</s_{field}>"
@@ -149,21 +119,14 @@ def parse_donut_output(generated_text: str, task_prompt: str = "") -> dict:
 
 
 def serialize_donut_parse(data) -> str:
-    """
-    Serialize ground truth thành text ổn định cho decoder target.
-
-    - Với schema 4 field đơn giản: dùng tag XML-like để giữ tương thích parser hiện tại.
-    - Với schema lồng nhau như CORD: dùng JSON ổn định để tránh ép dict/list sang string Python.
-    """
+    """Serialize ground truth into the decoder target text."""
     if isinstance(data, dict) and set(data.keys()).issubset(set(FIELDS)):
         return "".join(f"<s_{k}>{v}</s_{k}>" for k, v in data.items() if v not in ("", None))
     return json.dumps(data, ensure_ascii=False, sort_keys=True)
 
 
-# ── Visualization ──────────────────────────────────────────────────────────
-
 def visualize_sample(image_path: str, annotation: dict, ax=None):
-    """Hiển thị ảnh + annotation text overlay."""
+    """Render one image with its annotation text below the plot."""
     import matplotlib.pyplot as plt
 
     img = Image.open(image_path).convert("RGB")
@@ -174,7 +137,6 @@ def visualize_sample(image_path: str, annotation: dict, ax=None):
     ax.imshow(img)
     ax.set_title(os.path.basename(image_path), fontsize=8)
 
-    # Hiển thị annotation bên dưới ảnh
     info_lines = [f"{k}: {v}" for k, v in annotation.items() if v]
     info_text = "\n".join(info_lines)
     ax.set_xlabel(info_text, fontsize=7, ha="left", x=0)
@@ -184,10 +146,8 @@ def visualize_sample(image_path: str, annotation: dict, ax=None):
     return ax
 
 
-# ── Data loading ───────────────────────────────────────────────────────────
-
 def load_metadata(metadata_path: str) -> list[dict]:
-    """Đọc metadata.jsonl → list of dicts."""
+    """Load metadata.jsonl into a list of records."""
     records = []
     with open(metadata_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -198,7 +158,7 @@ def load_metadata(metadata_path: str) -> list[dict]:
 
 
 def extract_gt_parse(record: dict) -> dict:
-    """Trích gt_parse từ 1 record metadata.jsonl."""
+    """Extract gt_parse from one metadata.jsonl record."""
     gt_str = record.get("ground_truth", "{}")
     gt = json.loads(gt_str) if isinstance(gt_str, str) else gt_str
     return gt.get("gt_parse", {})

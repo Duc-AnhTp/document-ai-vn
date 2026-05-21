@@ -1,7 +1,7 @@
 """
-E2: Fine-tune Donut tren CORD (warm-up) va MC-OCR (main).
+Train Donut for the main branch baseline.
 
-Su dung:
+Usage:
     python scripts/train_donut.py --config configs/donut_cord.yaml
     python scripts/train_donut.py --config configs/donut_mcocr.yaml
 """
@@ -14,22 +14,28 @@ import sys
 
 import torch
 from PIL import Image
-from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
+from torch.utils.data import DataLoader, Dataset
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from scripts.utils import (
-    load_config,
     compute_metrics,
+    load_config,
     parse_donut_output,
     serialize_donut_parse,
 )
 
 
-# ── Dataset ────────────────────────────────────────────────────────────────
+def progress(iterable, **kwargs):
+    try:
+        from tqdm import tqdm
+
+        return tqdm(iterable, **kwargs)
+    except ImportError:
+        return iterable
+
 
 class DonutLocalDataset(Dataset):
-    """Dataset doc tu metadata.jsonl (MC-OCR, SROIE converted)."""
+    """Dataset loaded from local Donut metadata.jsonl files."""
 
     def __init__(self, data_dir, processor, max_length=768, task_prompt="<s_mcocr>"):
         self.data_dir = data_dir
@@ -67,14 +73,13 @@ class DonutLocalDataset(Dataset):
         )
 
         labels = tokenized.input_ids.squeeze()
-        # Mask padding tokens
         labels[labels == self.processor.tokenizer.pad_token_id] = -100
 
         return {"pixel_values": pixel_values, "labels": labels}
 
 
 class DonutHFDataset(Dataset):
-    """Dataset doc tu HuggingFace (CORD v2)."""
+    """Dataset loaded from HuggingFace, used for CORD v2 warm-up."""
 
     def __init__(self, hf_dataset, processor, max_length=768, task_prompt="<s_cord-v2>"):
         self.dataset = hf_dataset
@@ -109,14 +114,12 @@ class DonutHFDataset(Dataset):
         return {"pixel_values": pixel_values, "labels": labels}
 
 
-# ── Training ───────────────────────────────────────────────────────────────
-
 def train_one_epoch(model, dataloader, optimizer, device, grad_accum=1):
     model.train()
     total_loss = 0
     optimizer.zero_grad()
 
-    for i, batch in enumerate(tqdm(dataloader, desc="Train")):
+    for i, batch in enumerate(progress(dataloader, desc="Train")):
         pixel_values = batch["pixel_values"].to(device)
         labels = batch["labels"].to(device)
 
@@ -142,10 +145,10 @@ def validate(model, processor, dataloader, device, task_prompt="", metric_mode="
     model.eval()
     total_loss = 0
     preds, golds = [], []
-    
+
     prompt_ids = processor.tokenizer(task_prompt, add_special_tokens=False, return_tensors="pt").input_ids.to(device)
 
-    for batch in tqdm(dataloader, desc="Val"):
+    for batch in progress(dataloader, desc="Val"):
         pixel_values = batch["pixel_values"].to(device)
         labels = batch["labels"].to(device)
 
@@ -156,7 +159,6 @@ def validate(model, processor, dataloader, device, task_prompt="", metric_mode="
             batch_size = pixel_values.shape[0]
             decoder_input_ids = prompt_ids.repeat(batch_size, 1)
 
-            # Generate
             generated = model.generate(
                 pixel_values,
                 decoder_input_ids=decoder_input_ids,
@@ -189,7 +191,6 @@ def run_training(config):
     print(f"[INFO] Device: {device}")
     print(f"[INFO] Experiment: {config['experiment']}")
 
-    # Load model
     from transformers import DonutProcessor, VisionEncoderDecoderModel
 
     pretrained = config["model"]["pretrained"]
@@ -197,7 +198,6 @@ def run_training(config):
     processor = DonutProcessor.from_pretrained(pretrained)
     model = VisionEncoderDecoderModel.from_pretrained(pretrained)
 
-    # Add tokens
     added_tokens = config["model"].get("added_tokens", [])
     if added_tokens:
         processor.tokenizer.add_tokens(added_tokens)
@@ -206,16 +206,15 @@ def run_training(config):
 
     model.to(device)
 
-    # Load dataset
     task_prompt = config["model"]["task_prompt"]
     max_length = config["model"]["max_length"]
 
     if "dataset_name" in config["data"]:
-        # HuggingFace dataset (CORD)
         from datasets import load_dataset, load_from_disk
+
         local_path = config["data"].get("local_path", "")
         if local_path and os.path.exists(local_path):
-            print(f"[INFO] Loading dataset from local: {local_path}")
+            print(f"[INFO] Loading dataset from local cache: {local_path}")
             ds = load_from_disk(local_path)
         else:
             print(f"[INFO] Loading dataset from HuggingFace: {config['data']['dataset_name']}")
@@ -223,7 +222,6 @@ def run_training(config):
         train_ds = DonutHFDataset(ds["train"], processor, max_length, task_prompt)
         val_ds = DonutHFDataset(ds["validation"], processor, max_length, task_prompt)
     else:
-        # Local dataset (MC-OCR)
         train_ds = DonutLocalDataset(config["data"]["train_dir"], processor, max_length, task_prompt)
         val_ds = DonutLocalDataset(config["data"]["val_dir"], processor, max_length, task_prompt)
 
@@ -233,7 +231,6 @@ def run_training(config):
 
     print(f"[INFO] Train: {len(train_ds)} | Val: {len(val_ds)}")
 
-    # Optimizer
     lr = float(config["training"]["learning_rate"])
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
     grad_accum = config["training"].get("gradient_accumulation", 1)
@@ -241,7 +238,6 @@ def run_training(config):
     selection_metric = config["training"].get("selection_metric", "f1")
     metric_mode = config["training"].get("metric_mode", "kie_f1")
 
-    # Training loop
     ckpt_dir = config["output"]["checkpoint_dir"]
     log_file = config["output"]["log_file"]
     os.makedirs(ckpt_dir, exist_ok=True)
@@ -250,7 +246,7 @@ def run_training(config):
     best_score = None
     no_improve = 0
 
-    with open(log_file, "w", newline="") as csvf:
+    with open(log_file, "w", newline="", encoding="utf-8") as csvf:
         writer = csv.writer(csvf)
         writer.writerow(["epoch", "train_loss", "val_loss", "val_f1", "val_precision", "val_recall"])
 
@@ -292,7 +288,7 @@ def run_training(config):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train Donut (E2)")
+    parser = argparse.ArgumentParser(description="Train Donut")
     parser.add_argument("--config", required=True)
     args = parser.parse_args()
 
